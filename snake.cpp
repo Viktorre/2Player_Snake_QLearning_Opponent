@@ -44,10 +44,10 @@ class Snake
 public:
     int startX;                             // Starting x-coordinate of the snake
     int startY;                             // Starting y-coordinate of the snake
-    std::string direction;                  // Direction of the snake ("up", "down", "left", "right")
+    std::string *direction;                 // Pointer to the direction of the snake
     std::vector<std::tuple<int, int>> body; // Vector of tuples to represent the snake's body parts
 
-    Snake(int x, int y, const std::string &dir) : startX(x), startY(y), direction(dir)
+    Snake(int x, int y, std::string *dir) : startX(x), startY(y), direction(dir) // Take a pointer to a string
     {
         body.push_back(std::make_tuple(startX, startY)); // Initialize the body at the starting position
     }
@@ -68,19 +68,20 @@ public:
         int headY = std::get<1>(body[0]);
 
         // Calculate new head position based on direction
-        if (direction == "up")
+        if (*direction == "up")
+        
         {
             headY -= 1;
         }
-        else if (direction == "down")
+        else if (*direction == "down")
         {
             headY += 1;
         }
-        else if (direction == "left")
+        else if (*direction == "left")
         {
             headX -= 1;
         }
-        else if (direction == "right")
+        else if (*direction == "right")
         {
             headX += 1;
         }
@@ -103,7 +104,8 @@ int main()
     int width = 40;  // Game window width
     initGame();      // Initialize ncurses game screen
 
-    Snake snake_one = Snake(5, 5, "right");
+    std::string initialDirection = "right";           // Create a string for initial direction
+    Snake snake_one = Snake(5, 5, &initialDirection); // Pass the address of the string to the constructor
 
     int timer = 0;
 
@@ -115,6 +117,7 @@ int main()
         snake_one.move();
         usleep(100000); // Sleep for 100ms for game speed
         timer = timer + 1;
+        initialDirection = "down";
         if (timer > 10)
         {
             gameOver = true;
