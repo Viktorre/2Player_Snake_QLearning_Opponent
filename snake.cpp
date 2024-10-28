@@ -1,12 +1,11 @@
-#include <ncurses.h> // ncurses library for handling the terminal screen
-#include <vector>    // Standard vector library for storing snake body
-#include <cstdlib>   // For random numbers (used later for food spawning)
+#include <ncurses.h>
+#include <vector>
+#include <cstdlib>
 #include <unistd.h>
 #include <string>
-#include <tuple> // Include tuple library
+#include <tuple>
 #include <time.h>
 
-// Define a point struct to represent the snake's body parts (coordinates)
 struct Point
 {
     int x, y;
@@ -15,63 +14,101 @@ struct Point
 
 void initGame()
 {
-    initscr();             // ncurses: Start ncurses mode
-    cbreak();              // ncurses: Disable line buffering
-    noecho();              // ncurses: Don't show keypresses on the screen
-    curs_set(0);           // ncurses: Hide the cursor
-    keypad(stdscr, TRUE);  // ncurses: Enable arrow keys input
-    nodelay(stdscr, TRUE); // ncurses: Non-blocking input (game loop can run)
-    refresh();             // ncurses: Refresh the screen to apply changes
+    initscr();
+    cbreak();
+    noecho();
+    curs_set(0);
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE);
+    refresh();
 }
 
 void renderGameWindow(int height, int width)
 {
-    clear(); // ncurses: Clear the screen for rendering
-    // Draw border using ncurses
+    clear();
     for (int i = 0; i < width; i++)
     {
-        mvprintw(0, i, "#");          // ncurses: Top border at row 0
-        mvprintw(height - 1, i, "#"); // ncurses: Bottom border at row (height-1)
+        mvprintw(0, i, "#");
+        mvprintw(height - 1, i, "#");
     }
     for (int i = 0; i < height; i++)
     {
-        mvprintw(i, 0, "#");         // ncurses: Left border at column 0
-        mvprintw(i, width - 1, "#"); // ncurses: Right border at column (width-1)
+        mvprintw(i, 0, "#");
+        mvprintw(i, width - 1, "#");
     }
-    refresh(); // ncurses: Refresh to display the new game window
+    refresh();
 }
 
 class Snake
 {
 public:
-    int startX;                             // Starting x-coordinate of the snake
-    int startY;                             // Starting y-coordinate of the snake
-    std::string *direction;                 // Pointer to the direction of the snake
-    std::vector<std::tuple<int, int>> body; // Vector of tuples to represent the snake's body parts
+    int startX;
+    int startY;
+    std::string *direction;
+    std::vector<std::tuple<int, int>> body;
 
-    Snake(int x, int y, std::string *dir) : startX(x), startY(y), direction(dir) // Take a pointer to a string
+    int keyUp;
+    int keyDown;
+    int keyLeft;
+    int keyRight;
+    bool isAlive;
+
+    Snake(int x, int y, std::string *dir, int upKey, int downKey, int leftKey, int rightKey)
+        : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey), isAlive(true)
     {
-        body.push_back(std::make_tuple(startX, startY)); // Initialize the body at the starting position
+        body.push_back(std::make_tuple(startX, startY));
     }
 
     void renderSnake()
     {
-        for (const auto &part : body)
+        if (isAlive)
         {
-            int x = std::get<0>(part);
-            int y = std::get<1>(part);
-            mvprintw(y, x, "o"); // Render each part of the snake at its coordinates
+            for (const auto &part : body)
+            {
+                int x = std::get<0>(part);
+                int y = std::get<1>(part);
+                mvprintw(y, x, "o");
+            }
         }
-        refresh(); // Refresh the screen to display the snake
+        refresh();
     }
 
-    void move()
+    void move(int ch)
     {
-        // Get current head position
+        if (!isAlive)
+            return;
+
+        std::string newDirection = *direction;
+
+        if (ch == keyUp)
+        {
+            newDirection = "up";
+        }
+        else if (ch == keyDown)
+        {
+            newDirection = "down";
+        }
+        else if (ch == keyLeft)
+        {
+            newDirection = "left";
+        }
+        else if (ch == keyRight)
+        {
+            newDirection = "right";
+        }
+
+        // Prevent snake from reversing direction
+        if ((*direction == "up" && newDirection != "down") ||
+            (*direction == "down" && newDirection != "up") ||
+            (*direction == "left" && newDirection != "right") ||
+            (*direction == "right" && newDirection != "left"))
+        {
+            *direction = newDirection;
+        }
+
         int headX = std::get<0>(body[0]);
         int headY = std::get<1>(body[0]);
 
-        // Calculate new head position based on direction
         if (*direction == "up")
         {
             headY -= 1;
@@ -89,7 +126,14 @@ public:
             headX += 1;
         }
 
-        // Move the body
+        // Check for wall collision
+        if (headX <= 0 || headX >= 39 || headY <= 0 || headY >= 19)
+        {
+            isAlive = false;
+            return; // Exit the method since the snake is dead
+        }
+
+        // Move the snake's body
         for (int i = body.size() - 1; i > 0; --i)
         {
             body[i] = body[i - 1];
@@ -97,73 +141,38 @@ public:
         body[0] = std::make_tuple(headX, headY);
     }
 
-    bool checkCollision(int height, int width)
+    bool checkCollision()
     {
         int headX = std::get<0>(body[0]);
         int headY = std::get<1>(body[0]);
-
-        if (headX <= 0 || headX >= width - 1 || headY <= 0 || headY >= height - 1)
-        {
-            return true; // Collision with wall
-        }
 
         for (size_t i = 1; i < body.size(); ++i)
         {
             if (std::get<0>(body[i]) == headX && std::get<1>(body[i]) == headY)
             {
-                return true; // Collision with self
+                isAlive = false;
+                return true;
             }
         }
-        return false; // No collision
+
+        return false;
     }
 
-    void changeDirection()
-    {
-        int ch = getch(); // ncurses: Get key press if available
-
-        std::string newDirection;
-        if (ch == 'w' || ch == 'W')
-        {
-            newDirection = "up";
-        }
-        else if (ch == 's' || ch == 'S')
-        {
-            newDirection = "down";
-        }
-        else if (ch == 'a' || ch == 'A')
-        {
-            newDirection = "left";
-        }
-        else if (ch == 'd' || ch == 'D')
-        {
-            newDirection = "right";
-        }
-        else
-        {
-            return; // No valid direction change
-        }
-
-        if ((*direction == "up" && newDirection != "down") ||
-            (*direction == "down" && newDirection != "up") ||
-            (*direction == "left" && newDirection != "right") ||
-            (*direction == "right" && newDirection != "left"))
-        {
-            *direction = newDirection;
-        }
-    }
-
-    // New method to check if the snake eats the food
     bool eatFood(int foodX, int foodY)
     {
         int headX = std::get<0>(body[0]);
         int headY = std::get<1>(body[0]);
-        return headX == foodX && headY == foodY; // Return true if food is eaten
+        return headX == foodX && headY == foodY;
     }
 
-    // New method to grow the snake's body
     void grow()
     {
-        body.push_back(body.back()); // Duplicate the last segment
+        body.push_back(body.back());
+    }
+
+    int getLength() const
+    {
+        return body.size();
     }
 };
 
@@ -178,54 +187,83 @@ struct Food
 
     void spawn(int maxX, int maxY)
     {
-        x = rand() % (maxX - 2) + 1; // Avoid walls (1 to maxX - 2)
-        y = rand() % (maxY - 2) + 1; // Avoid walls (1 to maxY - 2)
+        x = rand() % (maxX - 2) + 1;
+        y = rand() % (maxY - 2) + 1;
     }
 
     void render() const
     {
-        mvprintw(y, x, "F"); // Use ncurses to print food at position
+        mvprintw(y, x, "F");
         refresh();
     }
 };
 
+void showScoreboard(const std::vector<Snake> &snakes)
+{
+    clear();
+    mvprintw(0, 0, "Scoreboard:");
+    for (size_t i = 0; i < snakes.size(); ++i)
+    {
+        mvprintw(i + 1, 0, "Player %zu: %d", i + 1, snakes[i].getLength())-1;
+    }
+    refresh();
+    usleep(1500000);
+    mvprintw(snakes.size() + 2, 0, "Press any key to exit...");
+    refresh();
+    getch(); // Wait for user input before exiting
+}
+
 int main()
 {
-    srand(time(0));  // Seed random number generator
-    int height = 20; // Game window height
-    int width = 40;  // Game window width
-    initGame();      // Initialize ncurses game screen
+    srand(time(0));
+    int height = 20;
+    int width = 40;
+    initGame();
+    Food food(width, height);
+    std::vector<Snake> snakes;
 
-    Food food(width, height); // Pass width and height to Food constructor
+    std::string direction_snake_one = "right";
+    Snake snake_one(5, 10, &direction_snake_one, 'w', 's', 'a', 'd');
+    snakes.push_back(snake_one);
 
-    std::vector<Snake> snakes;                           // Vector to hold multiple Snake objects
-    std::string direction_snake_one = "right";           // Create a string for initial direction
-    Snake snake_one = Snake(5, 5, &direction_snake_one); // Pass the address of the string to the constructor
-    snakes.push_back(snake_one);                         // Add snake_one to the vector
+    std::string direction_snake_two = "left";
+    Snake snake_two(35, 10, &direction_snake_two, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
+    snakes.push_back(snake_two);
 
-    bool gameOver = false;
-    while (!gameOver)
+    while (true)
     {
-        renderGameWindow(height, width); // Render the game window with borders
+        renderGameWindow(height, width);
+
+        int ch = getch(); // Get input once per loop
+
+        bool anySnakeAlive = false;
+
         for (auto &snake : snakes)
         {
-            snake.changeDirection();
+            snake.move(ch); // Pass input to move method
             snake.renderSnake();
-            snake.move();
-            gameOver = snake.checkCollision(height, width);
-            if (snake.eatFood(food.x, food.y))
+            snake.checkCollision(); // Check for collision with self
+            if (snake.isAlive)
             {
-                snake.grow();              // Call the grow method to increase the snake's length
-                food.spawn(width, height); // Respawn the food
+                anySnakeAlive = true;
+                if (snake.eatFood(food.x, food.y))
+                {
+                    snake.grow();
+                    food.spawn(width, height);
+                }
             }
         }
+
+        if (!anySnakeAlive)
+        {
+            break;
+        }
+
         food.render();
-
-        usleep(100000); // Sleep for 100ms for game speed
+        usleep(200000);
     }
+    showScoreboard(snakes); // Show scoreboard when no snake is alive
 
-    getch();  // ncurses: Wait for user input (pauses game)
-    endwin(); // ncurses: End ncurses mode and return to normal terminal
-
+    endwin();
     return 0;
 }
