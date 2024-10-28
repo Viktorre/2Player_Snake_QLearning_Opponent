@@ -81,21 +81,13 @@ public:
         std::string newDirection = *direction;
 
         if (ch == keyUp)
-        {
             newDirection = "up";
-        }
         else if (ch == keyDown)
-        {
             newDirection = "down";
-        }
         else if (ch == keyLeft)
-        {
             newDirection = "left";
-        }
         else if (ch == keyRight)
-        {
             newDirection = "right";
-        }
 
         // Prevent snake from reversing direction
         if ((*direction == "up" && newDirection != "down") ||
@@ -110,30 +102,14 @@ public:
         int headY = std::get<1>(body[0]);
 
         if (*direction == "up")
-        {
             headY -= 1;
-        }
         else if (*direction == "down")
-        {
             headY += 1;
-        }
         else if (*direction == "left")
-        {
             headX -= 1;
-        }
         else if (*direction == "right")
-        {
             headX += 1;
-        }
 
-        // Check for wall collision
-        if (headX <= 0 || headX >= 39 || headY <= 0 || headY >= 19)
-        {
-            isAlive = false;
-            return; // Exit the method since the snake is dead
-        }
-
-        // Move the snake's body
         for (int i = body.size() - 1; i > 0; --i)
         {
             body[i] = body[i - 1];
@@ -141,11 +117,22 @@ public:
         body[0] = std::make_tuple(headX, headY);
     }
 
-    bool checkCollision()
+    bool checkWallCollision(int width, int height)
     {
         int headX = std::get<0>(body[0]);
         int headY = std::get<1>(body[0]);
+        if (headX <= 0 || headX >= width - 1 || headY <= 0 || headY >= height - 1)
+        {
+            isAlive = false;
+            return true;
+        }
+        return false;
+    }
 
+    bool checkSelfCollision()
+    {
+        int headX = std::get<0>(body[0]);
+        int headY = std::get<1>(body[0]);
         for (size_t i = 1; i < body.size(); ++i)
         {
             if (std::get<0>(body[i]) == headX && std::get<1>(body[i]) == headY)
@@ -154,7 +141,27 @@ public:
                 return true;
             }
         }
+        return false;
+    }
 
+    bool checkOtherSnakeCollision(const std::vector<Snake> &snakes)
+    {
+        int headX = std::get<0>(body[0]);
+        int headY = std::get<1>(body[0]);
+        for (const auto &otherSnake : snakes)
+        {
+            if (&otherSnake == this || !otherSnake.isAlive)
+                continue;
+
+            for (const auto &part : otherSnake.body)
+            {
+                if (std::get<0>(part) == headX && std::get<1>(part) == headY)
+                {
+                    isAlive = false;
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -204,13 +211,10 @@ void showScoreboard(const std::vector<Snake> &snakes)
     mvprintw(0, 0, "Scoreboard:");
     for (size_t i = 0; i < snakes.size(); ++i)
     {
-        mvprintw(i + 1, 0, "Player %zu: %d", i + 1, snakes[i].getLength())-1;
+        mvprintw(i + 1, 0, "Player %zu: %d", i + 1, snakes[i].getLength());
     }
     refresh();
     usleep(1500000);
-    mvprintw(snakes.size() + 2, 0, "Press any key to exit...");
-    refresh();
-    getch(); // Wait for user input before exiting
 }
 
 int main()
@@ -235,17 +239,25 @@ int main()
         renderGameWindow(height, width);
 
         int ch = getch(); // Get input once per loop
-
         bool anySnakeAlive = false;
 
         for (auto &snake : snakes)
         {
             snake.move(ch); // Pass input to move method
             snake.renderSnake();
-            snake.checkCollision(); // Check for collision with self
+
             if (snake.isAlive)
             {
                 anySnakeAlive = true;
+
+                // Check for different types of collisions
+                if (snake.checkWallCollision(width, height) ||
+                    snake.checkSelfCollision() ||
+                    snake.checkOtherSnakeCollision(snakes))
+                {
+                    snake.isAlive = false;
+                }
+
                 if (snake.eatFood(food.x, food.y))
                 {
                     snake.grow();
@@ -255,9 +267,7 @@ int main()
         }
 
         if (!anySnakeAlive)
-        {
             break;
-        }
 
         food.render();
         usleep(200000);
