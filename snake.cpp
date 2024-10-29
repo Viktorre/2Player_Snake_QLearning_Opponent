@@ -46,28 +46,28 @@ public:
     int startX;
     int startY;
     std::string direction;
-    std::vector<std::unique_ptr<std::tuple<int, int>>> body; // Use unique_ptr for each body part
-
-    int keyUp;
-    int keyDown;
-    int keyLeft;
-    int keyRight;
+    std::vector<std::unique_ptr<std::tuple<int, int>>> body;
+    int keyUp, keyDown, keyLeft, keyRight;
     bool isAlive;
 
     Snake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey)
         : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey), isAlive(true)
     {
-        body.push_back(std::make_unique<std::tuple<int, int>>(startX, startY)); // Allocate the first body part
+        body.push_back(std::make_unique<std::tuple<int, int>>(startX, startY));
     }
 
     void renderSnake()
     {
         if (isAlive)
         {
-            for (const auto &part : body)
+            int headX = std::get<0>(*body[0]);
+            int headY = std::get<1>(*body[0]);
+            mvprintw(headY, headX, "O");
+
+            for (size_t i = 1; i < body.size(); ++i)
             {
-                int x = std::get<0>(*part); // Dereference to access tuple values
-                int y = std::get<1>(*part);
+                int x = std::get<0>(*body[i]);
+                int y = std::get<1>(*body[i]);
                 mvprintw(y, x, "o");
             }
         }
@@ -112,7 +112,7 @@ public:
 
         for (int i = body.size() - 1; i > 0; --i)
         {
-            *body[i] = *body[i - 1]; // Copy the values
+            *body[i] = *body[i - 1];
         }
         *body[0] = std::make_tuple(headX, headY);
     }
@@ -153,7 +153,7 @@ public:
 
     void grow()
     {
-        body.push_back(std::make_unique<std::tuple<int, int>>(*body.back())); // Add new body part at the last position
+        body.push_back(std::make_unique<std::tuple<int, int>>(*body.back()));
     }
 
     int getLength() const
@@ -254,7 +254,6 @@ int main()
     while (true)
     {
         renderGameWindow(height, width);
-
         int ch = getch();
         bool anySnakeAlive = false;
 
@@ -289,7 +288,6 @@ int main()
         usleep(100000);
     }
     showScoreboard(snakes);
-
     endwin();
     return 0;
 }
