@@ -43,8 +43,7 @@ void renderGameWindow(int height, int width)
 class Snake
 {
 public:
-    int startX;
-    int startY;
+    int startX, startY;
     std::string direction;
     std::vector<std::unique_ptr<std::tuple<int, int>>> body;
     int keyUp, keyDown, keyLeft, keyRight;
@@ -63,7 +62,6 @@ public:
             int headX = std::get<0>(*body[0]);
             int headY = std::get<1>(*body[0]);
             mvprintw(headY, headX, "O");
-
             for (size_t i = 1; i < body.size(); ++i)
             {
                 int x = std::get<0>(*body[i]);
@@ -74,13 +72,9 @@ public:
         refresh();
     }
 
-    void move(int ch)
+    void changeDirection(int ch)
     {
-        if (!isAlive)
-            return;
-
         std::string newDirection = direction;
-
         if (ch == keyUp)
             newDirection = "up";
         else if (ch == keyDown)
@@ -89,7 +83,6 @@ public:
             newDirection = "left";
         else if (ch == keyRight)
             newDirection = "right";
-
         if ((direction == "up" && newDirection != "down") ||
             (direction == "down" && newDirection != "up") ||
             (direction == "left" && newDirection != "right") ||
@@ -97,10 +90,14 @@ public:
         {
             direction = newDirection;
         }
+    }
 
+    void move()
+    {
+        if (!isAlive)
+            return;
         int headX = std::get<0>(*body[0]);
         int headY = std::get<1>(*body[0]);
-
         if (direction == "up")
             headY -= 1;
         else if (direction == "down")
@@ -109,7 +106,6 @@ public:
             headX -= 1;
         else if (direction == "right")
             headX += 1;
-
         for (int i = body.size() - 1; i > 0; --i)
         {
             *body[i] = *body[i - 1];
@@ -165,18 +161,12 @@ public:
 struct Food
 {
     int x, y;
-
-    Food(int maxX, int maxY)
-    {
-        spawn(maxX, maxY);
-    }
-
+    Food(int maxX, int maxY) { spawn(maxX, maxY); }
     void spawn(int maxX, int maxY)
     {
         x = rand() % (maxX - 2) + 1;
         y = rand() % (maxY - 2) + 1;
     }
-
     void render() const
     {
         mvprintw(y, x, "F");
@@ -187,25 +177,20 @@ struct Food
 void checkSnakeCollisions(std::vector<Snake> &snakes)
 {
     std::vector<bool> collisionFlags(snakes.size(), false);
-
     for (size_t i = 0; i < snakes.size(); ++i)
     {
         if (!snakes[i].isAlive)
             continue;
-
         int headX = std::get<0>(*snakes[i].body[0]);
         int headY = std::get<1>(*snakes[i].body[0]);
-
         for (size_t j = 0; j < snakes.size(); ++j)
         {
             if (i == j)
                 continue;
-
             for (const auto &part : snakes[j].body)
             {
                 int partX = std::get<0>(*part);
                 int partY = std::get<1>(*part);
-
                 if (headX == partX && headY == partY)
                 {
                     collisionFlags[i] = true;
@@ -214,13 +199,10 @@ void checkSnakeCollisions(std::vector<Snake> &snakes)
             }
         }
     }
-
     for (size_t i = 0; i < snakes.size(); ++i)
     {
         if (collisionFlags[i])
-        {
             snakes[i].isAlive = false;
-        }
     }
 }
 
@@ -230,7 +212,7 @@ void showScoreboard(const std::vector<Snake> &snakes)
     mvprintw(0, 0, "Scoreboard:");
     for (size_t i = 0; i < snakes.size(); ++i)
     {
-        mvprintw(i + 1, 0, "Player %zu: %d", i + 1, snakes[i].getLength());
+        mvprintw(i + 1, 0, "Player %zu: %d", i, snakes[i].getLength());
     }
     refresh();
     usleep(1500000);
@@ -244,33 +226,27 @@ int main()
     initGame();
     Food food(width, height);
     std::vector<Snake> snakes;
-
     Snake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
     snakes.push_back(std::move(snake_one));
-
     Snake snake_two(35, 10, "left", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
     snakes.push_back(std::move(snake_two));
-
     while (true)
     {
         renderGameWindow(height, width);
         int ch = getch();
         bool anySnakeAlive = false;
-
         for (auto &snake : snakes)
         {
-            snake.move(ch);
+            snake.changeDirection(ch);
+            snake.move();
             snake.renderSnake();
-
             if (snake.isAlive)
             {
                 anySnakeAlive = true;
-
                 if (snake.checkWallCollision(width, height) || snake.checkSelfCollision())
                 {
                     snake.isAlive = false;
                 }
-
                 if (snake.eatFood(food.x, food.y))
                 {
                     snake.grow();
@@ -278,12 +254,9 @@ int main()
                 }
             }
         }
-
         checkSnakeCollisions(snakes);
-
         if (!anySnakeAlive)
             break;
-
         food.render();
         usleep(100000);
     }
