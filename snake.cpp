@@ -44,7 +44,7 @@ class Snake
 public:
     int startX;
     int startY;
-    std::string *direction;
+    std::string direction;
     std::vector<std::tuple<int, int>> body;
 
     int keyUp;
@@ -53,7 +53,7 @@ public:
     int keyRight;
     bool isAlive;
 
-    Snake(int x, int y, std::string *dir, int upKey, int downKey, int leftKey, int rightKey)
+    Snake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey)
         : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey), isAlive(true)
     {
         body.push_back(std::make_tuple(startX, startY));
@@ -78,7 +78,7 @@ public:
         if (!isAlive)
             return;
 
-        std::string newDirection = *direction;
+        std::string newDirection = direction;
 
         if (ch == keyUp)
             newDirection = "up";
@@ -90,24 +90,24 @@ public:
             newDirection = "right";
 
         // Prevent snake from reversing direction
-        if ((*direction == "up" && newDirection != "down") ||
-            (*direction == "down" && newDirection != "up") ||
-            (*direction == "left" && newDirection != "right") ||
-            (*direction == "right" && newDirection != "left"))
+        if ((direction == "up" && newDirection != "down") ||
+            (direction == "down" && newDirection != "up") ||
+            (direction == "left" && newDirection != "right") ||
+            (direction == "right" && newDirection != "left"))
         {
-            *direction = newDirection;
+            direction = newDirection;
         }
 
         int headX = std::get<0>(body[0]);
         int headY = std::get<1>(body[0]);
 
-        if (*direction == "up")
+        if (direction == "up")
             headY -= 1;
-        else if (*direction == "down")
+        else if (direction == "down")
             headY += 1;
-        else if (*direction == "left")
+        else if (direction == "left")
             headX -= 1;
-        else if (*direction == "right")
+        else if (direction == "right")
             headX += 1;
 
         for (int i = body.size() - 1; i > 0; --i)
@@ -144,26 +144,6 @@ public:
         return false;
     }
 
-    bool checkOtherSnakeCollision(const std::vector<Snake> &snakes)
-    {
-        int headX = std::get<0>(body[0]);
-        int headY = std::get<1>(body[0]);
-        for (const auto &otherSnake : snakes)
-        {
-            if (&otherSnake == this || !otherSnake.isAlive)
-                continue;
-
-            for (const auto &part : otherSnake.body)
-            {
-                if (std::get<0>(part) == headX && std::get<1>(part) == headY)
-                {
-                    isAlive = false;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
     bool eatFood(int foodX, int foodY)
     {
@@ -226,12 +206,10 @@ int main()
     Food food(width, height);
     std::vector<Snake> snakes;
 
-    std::string direction_snake_one = "right";
-    Snake snake_one(5, 10, &direction_snake_one, 'w', 's', 'a', 'd');
+    Snake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
     snakes.push_back(snake_one);
 
-    std::string direction_snake_two = "left";
-    Snake snake_two(35, 10, &direction_snake_two, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
+    Snake snake_two(35, 10, "left", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
     snakes.push_back(snake_two);
 
     while (true)
@@ -252,8 +230,7 @@ int main()
 
                 // Check for different types of collisions
                 if (snake.checkWallCollision(width, height) ||
-                    snake.checkSelfCollision() ||
-                    snake.checkOtherSnakeCollision(snakes))
+                    snake.checkSelfCollision())
                 {
                     snake.isAlive = false;
                 }
