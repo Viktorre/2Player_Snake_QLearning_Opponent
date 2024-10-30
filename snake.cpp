@@ -48,11 +48,34 @@ public:
     std::vector<std::unique_ptr<std::tuple<int, int>>> body;
     int keyUp, keyDown, keyLeft, keyRight;
     bool isAlive;
+    bool isCpu; // new attribute to identify CPU-controlled snake
 
-    Snake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey)
-        : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey), isAlive(true)
+    Snake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey, bool cpuControl = false)
+        : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey),
+          isAlive(true), isCpu(cpuControl)
     {
         body.push_back(std::make_unique<std::tuple<int, int>>(startX, startY));
+    }
+
+    virtual void changeDirection(int ch)
+    {
+        std::string newDirection = direction;
+        if (ch == keyUp)
+            newDirection = "up";
+        else if (ch == keyDown)
+            newDirection = "down";
+        else if (ch == keyLeft)
+            newDirection = "left";
+        else if (ch == keyRight)
+            newDirection = "right";
+
+        if ((direction == "up" && newDirection != "down") ||
+            (direction == "down" && newDirection != "up") ||
+            (direction == "left" && newDirection != "right") ||
+            (direction == "right" && newDirection != "left"))
+        {
+            direction = newDirection;
+        }
     }
 
     void renderSnake()
@@ -70,26 +93,6 @@ public:
             }
         }
         refresh();
-    }
-
-    void changeDirection(int ch)
-    {
-        std::string newDirection = direction;
-        if (ch == keyUp)
-            newDirection = "up";
-        else if (ch == keyDown)
-            newDirection = "down";
-        else if (ch == keyLeft)
-            newDirection = "left";
-        else if (ch == keyRight)
-            newDirection = "right";
-        if ((direction == "up" && newDirection != "down") ||
-            (direction == "down" && newDirection != "up") ||
-            (direction == "left" && newDirection != "right") ||
-            (direction == "right" && newDirection != "left"))
-        {
-            direction = newDirection;
-        }
     }
 
     void move()
@@ -158,6 +161,45 @@ public:
     }
 };
 
+class CpuSnake : public Snake
+{
+public:
+    CpuSnake(int x, int y, std::string dir)
+        : Snake(x, y, dir, 0, 0, 0, 0, true) {}
+
+    void changeDirection(int) override
+    {
+        // Change direction randomly
+        int randomDirection = rand() % 4;
+        std::string newDirection = direction;
+
+        switch (randomDirection)
+        {
+        case 0:
+            newDirection = "up";
+            break;
+        case 1:
+            newDirection = "down";
+            break;
+        case 2:
+            newDirection = "left";
+            break;
+        case 3:
+            newDirection = "right";
+            break;
+        }
+
+        // Avoid reversing direction
+        if ((direction == "up" && newDirection != "down") ||
+            (direction == "down" && newDirection != "up") ||
+            (direction == "left" && newDirection != "right") ||
+            (direction == "right" && newDirection != "left"))
+        {
+            direction = newDirection;
+        }
+    }
+};
+
 struct Food
 {
     int x, y;
@@ -174,45 +216,39 @@ struct Food
     }
 };
 
-void checkSnakeCollisions(std::vector<Snake> &snakes)
+void checkSnakeCollisions(std::vector<Snake*> &snakes)
 {
-    std::vector<bool> collisionFlags(snakes.size(), false);
     for (size_t i = 0; i < snakes.size(); ++i)
     {
-        if (!snakes[i].isAlive)
+        if (!snakes[i]->isAlive)
             continue;
-        int headX = std::get<0>(*snakes[i].body[0]);
-        int headY = std::get<1>(*snakes[i].body[0]);
+        int headX = std::get<0>(*snakes[i]->body[0]);
+        int headY = std::get<1>(*snakes[i]->body[0]);
         for (size_t j = 0; j < snakes.size(); ++j)
         {
             if (i == j)
                 continue;
-            for (const auto &part : snakes[j].body)
+            for (const auto &part : snakes[j]->body)
             {
                 int partX = std::get<0>(*part);
                 int partY = std::get<1>(*part);
                 if (headX == partX && headY == partY)
                 {
-                    collisionFlags[i] = true;
+                    snakes[i]->isAlive = false;
                     break;
                 }
             }
         }
     }
-    for (size_t i = 0; i < snakes.size(); ++i)
-    {
-        if (collisionFlags[i])
-            snakes[i].isAlive = false;
-    }
 }
 
-void showScoreboard(const std::vector<Snake> &snakes)
+void showScoreboard(const std::vector<Snake*> &snakes)
 {
     clear();
     mvprintw(0, 0, "Scoreboard:");
     for (size_t i = 0; i < snakes.size(); ++i)
     {
-        mvprintw(i + 1, 0, "Player %zu: %d", i, snakes[i].getLength());
+        mvprintw(i + 1, 0, "Player %zu: %d", i, snakes[i]->getLength());
     }
     refresh();
     usleep(1500000);
@@ -225,31 +261,36 @@ int main()
     int width = 40;
     initGame();
     Food food(width, height);
-    std::vector<Snake> snakes;
-    Snake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
-    snakes.push_back(std::move(snake_one));
-    Snake snake_two(35, 10, "left", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT);
-    snakes.push_back(std::move(snake_two));
+    std::vector<Snake*> snakes;
+    Snake playerSnake(5, 10, "right", 'w', 's', 'a', 'd');
+    CpuSnake cpuSnake(35, 10, "left");
+    snakes.push_back(&playerSnake);
+    snakes.push_back(&cpuSnake);
+
     while (true)
     {
         renderGameWindow(height, width);
         int ch = getch();
         bool anySnakeAlive = false;
-        for (auto &snake : snakes)
+        for (auto *snake : snakes)
         {
-            snake.changeDirection(ch);
-            snake.move();
-            snake.renderSnake();
-            if (snake.isAlive)
+            if (snake->isCpu)
+                snake->changeDirection(0); // CPU changes direction randomly
+            else
+                snake->changeDirection(ch); // Player changes direction based on input
+
+            snake->move();
+            snake->renderSnake();
+            if (snake->isAlive)
             {
                 anySnakeAlive = true;
-                if (snake.checkWallCollision(width, height) || snake.checkSelfCollision())
+                if (snake->checkWallCollision(width, height) || snake->checkSelfCollision())
                 {
-                    snake.isAlive = false;
+                    snake->isAlive = false;
                 }
-                if (snake.eatFood(food.x, food.y))
+                if (snake->eatFood(food.x, food.y))
                 {
-                    snake.grow();
+                    snake->grow();
                     food.spawn(width, height);
                 }
             }
