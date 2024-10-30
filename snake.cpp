@@ -46,37 +46,16 @@ public:
     int startX, startY;
     std::string direction;
     std::vector<std::unique_ptr<std::tuple<int, int>>> body;
-    int keyUp, keyDown, keyLeft, keyRight;
     bool isAlive;
-    bool isCpu; // new attribute to identify CPU-controlled snake
+    bool isCpu;
 
-    Snake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey, bool cpuControl = false)
-        : startX(x), startY(y), direction(dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey),
-          isAlive(true), isCpu(cpuControl)
+    Snake(int x, int y, std::string dir, bool cpuControl = false)
+        : startX(x), startY(y), direction(dir), isAlive(true), isCpu(cpuControl)
     {
         body.push_back(std::make_unique<std::tuple<int, int>>(startX, startY));
     }
 
-    virtual void changeDirection(int ch)
-    {
-        std::string newDirection = direction;
-        if (ch == keyUp)
-            newDirection = "up";
-        else if (ch == keyDown)
-            newDirection = "down";
-        else if (ch == keyLeft)
-            newDirection = "left";
-        else if (ch == keyRight)
-            newDirection = "right";
-
-        if ((direction == "up" && newDirection != "down") ||
-            (direction == "down" && newDirection != "up") ||
-            (direction == "left" && newDirection != "right") ||
-            (direction == "right" && newDirection != "left"))
-        {
-            direction = newDirection;
-        }
-    }
+    virtual void changeDirection(int ch) = 0;
 
     void renderSnake()
     {
@@ -161,15 +140,44 @@ public:
     }
 };
 
+class HumanSnake : public Snake
+{
+public:
+    int keyUp, keyDown, keyLeft, keyRight;
+
+    HumanSnake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey)
+        : Snake(x, y, dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey) {}
+
+    void changeDirection(int ch) override
+    {
+        std::string newDirection = direction;
+        if (ch == keyUp)
+            newDirection = "up";
+        else if (ch == keyDown)
+            newDirection = "down";
+        else if (ch == keyLeft)
+            newDirection = "left";
+        else if (ch == keyRight)
+            newDirection = "right";
+
+        if ((direction == "up" && newDirection != "down") ||
+            (direction == "down" && newDirection != "up") ||
+            (direction == "left" && newDirection != "right") ||
+            (direction == "right" && newDirection != "left"))
+        {
+            direction = newDirection;
+        }
+    }
+};
+
 class CpuSnake : public Snake
 {
 public:
     CpuSnake(int x, int y, std::string dir)
-        : Snake(x, y, dir, 0, 0, 0, 0, true) {}
+        : Snake(x, y, dir, true) {}
 
     void changeDirection(int) override
     {
-        // Change direction randomly
         int randomDirection = rand() % 4;
         std::string newDirection = direction;
 
@@ -189,7 +197,6 @@ public:
             break;
         }
 
-        // Avoid reversing direction
         if ((direction == "up" && newDirection != "down") ||
             (direction == "down" && newDirection != "up") ||
             (direction == "left" && newDirection != "right") ||
@@ -262,9 +269,9 @@ int main()
     initGame();
     Food food(width, height);
     std::vector<Snake*> snakes;
-    Snake playerSnake(5, 10, "right", 'w', 's', 'a', 'd');
+    HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
     CpuSnake cpuSnake(35, 10, "left");
-    snakes.push_back(&playerSnake);
+    snakes.push_back(&snake_one);
     snakes.push_back(&cpuSnake);
 
     while (true)
@@ -275,9 +282,9 @@ int main()
         for (auto *snake : snakes)
         {
             if (snake->isCpu)
-                snake->changeDirection(0); // CPU changes direction randomly
+                snake->changeDirection(0);
             else
-                snake->changeDirection(ch); // Player changes direction based on input
+                snake->changeDirection(ch);
 
             snake->move();
             snake->renderSnake();
