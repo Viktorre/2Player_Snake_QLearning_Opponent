@@ -7,7 +7,6 @@
 #include <memory>
 #include <time.h>
 
-
 void initGame()
 {
     initscr();
@@ -35,6 +34,22 @@ void renderGameWindow(int height, int width)
     refresh();
 }
 
+struct Food
+{
+    int x, y;
+    Food(int maxX, int maxY) { spawn(maxX, maxY); }
+    void spawn(int maxX, int maxY)
+    {
+        x = rand() % (maxX - 2) + 1;
+        y = rand() % (maxY - 2) + 1;
+    }
+    void render() const
+    {
+        mvprintw(y, x, "F");
+        refresh();
+    }
+};
+
 class Snake
 {
 public:
@@ -50,7 +65,7 @@ public:
         body.push_back(std::make_unique<std::tuple<int, int>>(startX, startY));
     }
 
-    virtual void changeDirection(int ch) = 0;
+    virtual void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) = 0;
 
     void renderSnake()
     {
@@ -143,7 +158,7 @@ public:
     HumanSnake(int x, int y, std::string dir, int upKey, int downKey, int leftKey, int rightKey)
         : Snake(x, y, dir), keyUp(upKey), keyDown(downKey), keyLeft(leftKey), keyRight(rightKey) {}
 
-    void changeDirection(int ch) override
+    void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) override
     {
         std::string newDirection = direction;
         if (ch == keyUp)
@@ -171,7 +186,7 @@ public:
     CpuSnake(int x, int y, std::string dir)
         : Snake(x, y, dir, true) {}
 
-    void changeDirection(int) override
+    void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) override
     {
         int randomDirection = rand() % 4;
         std::string newDirection = direction;
@@ -202,23 +217,8 @@ public:
     }
 };
 
-struct Food
-{
-    int x, y;
-    Food(int maxX, int maxY) { spawn(maxX, maxY); }
-    void spawn(int maxX, int maxY)
-    {
-        x = rand() % (maxX - 2) + 1;
-        y = rand() % (maxY - 2) + 1;
-    }
-    void render() const
-    {
-        mvprintw(y, x, "F");
-        refresh();
-    }
-};
 
-void checkSnakeCollisions(std::vector<Snake*> &snakes)
+void checkSnakeCollisions(std::vector<Snake *> &snakes)
 {
     for (size_t i = 0; i < snakes.size(); ++i)
     {
@@ -244,7 +244,7 @@ void checkSnakeCollisions(std::vector<Snake*> &snakes)
     }
 }
 
-void showScoreboard(const std::vector<Snake*> &snakes)
+void showScoreboard(const std::vector<Snake *> &snakes)
 {
     clear();
     mvprintw(0, 0, "Scoreboard:");
@@ -263,7 +263,7 @@ int main()
     int width = 40;
     initGame();
     Food food(width, height);
-    std::vector<Snake*> snakes;
+    std::vector<Snake *> snakes;
     HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
     CpuSnake cpuSnake(35, 10, "left");
     snakes.push_back(&snake_one);
@@ -276,11 +276,7 @@ int main()
         bool anySnakeAlive = false;
         for (auto *snake : snakes)
         {
-            if (snake->isCpu)
-                snake->changeDirection(0);
-            else
-                snake->changeDirection(ch);
-
+            snake->changeDirection(ch, snakes, food, width, height);
             snake->move();
             snake->renderSnake();
             if (snake->isAlive)
