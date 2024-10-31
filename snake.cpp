@@ -7,11 +7,6 @@
 #include <memory>
 #include <time.h>
 
-struct Point
-{
-    int x, y;
-    Point(int col, int row) : x(col), y(row) {}
-};
 
 void initGame()
 {
