@@ -6,6 +6,11 @@
 #include <tuple>
 #include <memory>
 #include <time.h>
+#include <unordered_map>
+#include <cmath>
+#include <ctime>
+#include <algorithm>
+
 
 void initGame()
 {
@@ -261,6 +266,110 @@ public:
     }
 };
 
+
+
+class QLearningSnake : public Snake
+{
+public:
+    std::unordered_map<std::string, std::vector<double>> QTable; // Q-value table
+    double alpha = 0.1;                                          // Learning rate
+    double gamma = 0.9;                                          // Discount factor
+    double epsilon = 0.1;                                        // Exploration rate
+    std::vector<std::string> actions = {"up", "down", "left", "right"};
+
+    QLearningSnake(int x, int y, std::string dir)
+        : Snake(x, y, dir)
+    {
+        srand(time(0));
+    }
+
+    void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) override
+    {
+        std::string state = getStateRepresentation(snakes, food, width, height);
+        std::string action = chooseAction(state);
+
+        if (action == "up" && direction != "down")
+        {
+            direction = "up";
+        }
+        else if (action == "down" && direction != "up")
+        {
+            direction = "down";
+        }
+        else if (action == "left" && direction != "right")
+        {
+            direction = "left";
+        }
+        else if (action == "right" && direction != "left")
+        {
+            direction = "right";
+        }
+
+        // Perform the action, receive the reward, and update Q-values
+        int reward = performActionAndGetReward(snakes, food, width, height);
+        std::string nextState = getStateRepresentation(snakes, food, width, height);
+        updateQValue(state, action, reward, nextState);
+    }
+
+private:
+    std::string getStateRepresentation(std::vector<Snake *> snakes, Food food, int width, int height)
+    {
+        // Example state: relative position of the food
+        int headX = std::get<0>(*body[0]);
+        int headY = std::get<1>(*body[0]);
+        int foodDX = food.x - headX;
+        int foodDY = food.y - headY;
+        return std::to_string(foodDX) + "," + std::to_string(foodDY);
+    }
+
+    std::string chooseAction(const std::string &state)
+    {
+        if ((double)rand() / RAND_MAX < epsilon)
+        {
+            // Exploration: Choose a random action
+            return actions[rand() % actions.size()];
+        }
+        // Exploitation: Choose the action with the highest Q-value
+        if (QTable.find(state) == QTable.end())
+        {
+            QTable[state] = std::vector<double>(4, 0.0); // Initialize Q-values
+        }
+        int bestActionIndex = std::max_element(QTable[state].begin(), QTable[state].end()) - QTable[state].begin();
+        return actions[bestActionIndex];
+    }
+
+    int performActionAndGetReward(std::vector<Snake *> snakes, Food food, int width, int height)
+    {
+        // Example reward: +10 for eating food, -10 for dying, 0 otherwise
+        if (eatFood(food.x, food.y))
+        {
+            grow();
+            return 10;
+        }
+        if (checkWallCollision(width, height) || checkSelfCollision())
+        {
+            isAlive = false;
+            return -10;
+        }
+        return 0;
+    }
+
+    void updateQValue(const std::string &state, const std::string &action, int reward, const std::string &nextState)
+    {
+        if (QTable.find(state) == QTable.end())
+        {
+            QTable[state] = std::vector<double>(4, 0.0); // Initialize Q-values
+        }
+        if (QTable.find(nextState) == QTable.end())
+        {
+            QTable[nextState] = std::vector<double>(4, 0.0); // Initialize Q-values
+        }
+        int actionIndex = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), action));
+        double maxNextQValue = *std::max_element(QTable[nextState].begin(), QTable[nextState].end());
+        QTable[state][actionIndex] += alpha * (reward + gamma * maxNextQValue - QTable[state][actionIndex]);
+    }
+};
+
 void checkSnakeCollisions(std::vector<Snake *> &snakes)
 {
     for (size_t i = 0; i < snakes.size(); ++i)
@@ -295,6 +404,9 @@ void checkSnakeCollisions(std::vector<Snake *> &snakes)
     }
 }
 
+
+
+
 void showScoreboard(const std::vector<Snake *> &snakes)
 {
     clear();
@@ -316,9 +428,9 @@ int main()
     Food food(width, height);
     std::vector<Snake *> snakes;
     HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
-    SmartSnake SmartSnake(35, 10, "left");
+    QLearningSnake snake_two(35, 10, "left");
     snakes.push_back(&snake_one);
-    snakes.push_back(&SmartSnake);
+    snakes.push_back(&snake_two);
 
     while (true)
     {
