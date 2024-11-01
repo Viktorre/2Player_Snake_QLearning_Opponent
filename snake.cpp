@@ -180,10 +180,10 @@ public:
     }
 };
 
-class CpuSnake : public Snake
+class RandomSnake : public Snake
 {
 public:
-    CpuSnake(int x, int y, std::string dir)
+    RandomSnake(int x, int y, std::string dir)
         : Snake(x, y, dir, true) {}
 
     void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) override
@@ -217,23 +217,74 @@ public:
     }
 };
 
+class SmartSnake : public Snake
+{
+public:
+    SmartSnake(int x, int y, std::string dir)
+        : Snake(x, y, dir, true) {}
+
+    void changeDirection(int ch, std::vector<Snake *> snakes, Food food, int width, int height) override
+    {
+        int headX = std::get<0>(*body[0]);
+        int headY = std::get<1>(*body[0]);
+        int foodX = food.x;
+        int foodY = food.y;
+
+        std::string newDirection = direction;
+
+        // Compute the optimal direction to approach the food
+        if (headX < foodX && direction != "left")
+        {
+            newDirection = "right";
+        }
+        else if (headX > foodX && direction != "right")
+        {
+            newDirection = "left";
+        }
+        else if (headY < foodY && direction != "up")
+        {
+            newDirection = "down";
+        }
+        else if (headY > foodY && direction != "down")
+        {
+            newDirection = "up";
+        }
+
+        // Ensure the snake does not reverse direction
+        if ((direction == "up" && newDirection != "down") ||
+            (direction == "down" && newDirection != "up") ||
+            (direction == "left" && newDirection != "right") ||
+            (direction == "right" && newDirection != "left"))
+        {
+            direction = newDirection;
+        }
+    }
+};
 
 void checkSnakeCollisions(std::vector<Snake *> &snakes)
 {
     for (size_t i = 0; i < snakes.size(); ++i)
     {
         if (!snakes[i]->isAlive)
-            continue;
+            continue; // Skip dead snakes
+
         int headX = std::get<0>(*snakes[i]->body[0]);
         int headY = std::get<1>(*snakes[i]->body[0]);
+
         for (size_t j = 0; j < snakes.size(); ++j)
         {
+            if (!snakes[j]->isAlive)
+                continue; // Skip collisions with dead snakes
+
+            // Skip self-collision check within the same snake
             if (i == j)
                 continue;
+
             for (const auto &part : snakes[j]->body)
             {
                 int partX = std::get<0>(*part);
                 int partY = std::get<1>(*part);
+
                 if (headX == partX && headY == partY)
                 {
                     snakes[i]->isAlive = false;
@@ -265,9 +316,9 @@ int main()
     Food food(width, height);
     std::vector<Snake *> snakes;
     HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
-    CpuSnake cpuSnake(35, 10, "left");
+    SmartSnake SmartSnake(35, 10, "left");
     snakes.push_back(&snake_one);
-    snakes.push_back(&cpuSnake);
+    snakes.push_back(&SmartSnake);
 
     while (true)
     {
