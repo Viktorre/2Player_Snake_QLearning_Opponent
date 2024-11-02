@@ -10,7 +10,9 @@
 #include <cmath>
 #include <ctime>
 #include <algorithm>
-
+#include <fstream>  // For file input and output
+#include <sstream>  // For string stream processing
+#include <iostream> // For basic input and output (if needed for debugging)
 
 void initGame()
 {
@@ -272,9 +274,9 @@ class QLearningSnake : public Snake
 {
 public:
     std::unordered_map<std::string, std::vector<double>> QTable; // Q-value table
-    double alpha = 0.1;                                          // Learning rate
-    double gamma = 0.9;                                          // Discount factor
-    double epsilon = 0.1;                                        // Exploration rate
+    double alpha = 0.3;                                          // Learning rate. the higher the faster overwrite old knowledge
+    double gamma = 0.3;                                          // Discount factor. the higher the more future orientation
+    double epsilon = 0.4;                                        // Exploration rate: the higher the more exploration
     std::vector<std::string> actions = {"up", "down", "left", "right"};
 
     QLearningSnake(int x, int y, std::string dir)
@@ -309,6 +311,50 @@ public:
         int reward = performActionAndGetReward(snakes, food, width, height);
         std::string nextState = getStateRepresentation(snakes, food, width, height);
         updateQValue(state, action, reward, nextState);
+    }
+
+    // Method to save QTable to a custom text file
+    void saveQTableToFile(const std::string &filename)
+    {
+        std::ofstream file(filename);
+        if (!file.is_open())
+            return;
+
+        for (const auto &entry : QTable)
+        {
+            file << entry.first << " "; // State as string
+            for (double qValue : entry.second)
+            {
+                file << qValue << " "; // Q-values
+            }
+            file << "\n"; // New line for each state
+        }
+        file.close();
+    }
+
+    // Method to load QTable from a custom text file
+    void loadQTableFromFile(const std::string &filename)
+    {
+        std::ifstream file(filename);
+        if (!file.is_open())
+            return;
+
+        std::string line;
+        while (std::getline(file, line))
+        {
+            std::istringstream iss(line);
+            std::string state;
+            iss >> state; // Read the state
+
+            std::vector<double> qValues;
+            double qValue;
+            while (iss >> qValue)
+            {
+                qValues.push_back(qValue); // Read Q-values
+            }
+            QTable[state] = qValues; // Store in QTable
+        }
+        file.close();
     }
 
 private:
@@ -429,6 +475,7 @@ int main()
     std::vector<Snake *> snakes;
     HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
     QLearningSnake snake_two(35, 10, "left");
+    snake_two.loadQTableFromFile("qtable.txt");
     snakes.push_back(&snake_one);
     snakes.push_back(&snake_two);
 
@@ -463,6 +510,7 @@ int main()
         usleep(100000);
     }
     showScoreboard(snakes);
+    snake_two.saveQTableToFile("qtable.txt");
     endwin();
     return 0;
 }
