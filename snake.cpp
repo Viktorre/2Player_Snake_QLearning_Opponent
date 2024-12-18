@@ -268,8 +268,6 @@ public:
     }
 };
 
-
-
 class QLearningSnake : public Snake
 {
 public:
@@ -450,9 +448,6 @@ void checkSnakeCollisions(std::vector<Snake *> &snakes)
     }
 }
 
-
-
-
 void showScoreboard(const std::vector<Snake *> &snakes)
 {
     clear();
@@ -462,33 +457,37 @@ void showScoreboard(const std::vector<Snake *> &snakes)
         mvprintw(i + 1, 0, "Player %zu: %d", i, snakes[i]->getLength());
     }
     refresh();
-    usleep(1500000);
+    // usleep(500000);
 }
 
-int main()
+void playGame(int timeProTurn, const std::string &qTableFileName)
 {
-    srand(time(0));
     int height = 20;
     int width = 40;
+    srand(time(0));
     initGame();
     Food food(width, height);
     std::vector<Snake *> snakes;
-    HumanSnake snake_one(5, 10, "right", 'w', 's', 'a', 'd');
+
+    SmartSnake snake_one(5, 10, "right");
     QLearningSnake snake_two(35, 10, "left");
-    snake_two.loadQTableFromFile("qtable.txt");
+    snake_two.loadQTableFromFile(qTableFileName);
+
     snakes.push_back(&snake_one);
     snakes.push_back(&snake_two);
 
     while (true)
     {
-        renderGameWindow(height, width);
+        // renderGameWindow(height, width);
         int ch = getch();
         bool anySnakeAlive = false;
+
         for (auto *snake : snakes)
         {
             snake->changeDirection(ch, snakes, food, width, height);
             snake->move();
-            snake->renderSnake();
+            // snake->renderSnake();
+
             if (snake->isAlive)
             {
                 anySnakeAlive = true;
@@ -503,14 +502,30 @@ int main()
                 }
             }
         }
+
         checkSnakeCollisions(snakes);
         if (!anySnakeAlive)
             break;
-        food.render();
-        usleep(100000);
+
+        // food.render();
+        usleep(timeProTurn); // microseconds, where 1 second = 1,000,000 microseconds
     }
+
     showScoreboard(snakes);
-    snake_two.saveQTableToFile("qtable.txt");
+    snake_two.saveQTableToFile(qTableFileName);
     endwin();
+}
+
+// Main function
+int main()
+{
+    std::string qTableFileName = "qtable.txt";
+    int timeProTurn = 1;   // 100000
+    int numberOfGames = 500;
+
+    for (int game = 0; game < numberOfGames; ++game)
+    {
+        playGame(timeProTurn, qTableFileName);
+    }
     return 0;
 }
